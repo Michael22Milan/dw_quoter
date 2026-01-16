@@ -1,0 +1,5 @@
+# SLM智能报价系统 - 依赖清单
+# Python 3.10+ 推荐 3.13
+
+customtkinter>=5.2.0
+peewee>=3.17.0

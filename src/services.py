@@ -174,28 +174,30 @@ class QuoteService:
     def calculate_quote(
         material_name: str,
         weight_g: float,
-        difficulty: float = 1.0
+        difficulty: int = 1,
+        risk: float = 0,
+        post_process_hours: float = 0,
+        post_process_rate: float = 50
     ) -> dict:
         """
-        计算报价
+        计算报价 (v2.2 新版算法)
         
-        公式: 报价 = (重量 / 效率) × 每分钟成本 × 难度系数
+        公式:
+            基准打印价格 = (重量 / 效率) × 每分钟成本
+            打印价格 = 基准打印价格 × (难度系数 + 风险系数)
+            后处理价格 = 后处理时长 × 后处理单价
+            最终报价 = 打印价格 + 后处理价格
         
         Args:
             material_name: 材料名称
             weight_g: 预估重量 (克)
-            difficulty: 难度系数 (0.8-2.0)
+            difficulty: 难度系数 (1/2/3)
+            risk: 风险系数 (0/0.5/1/1.5/2)
+            post_process_hours: 后处理时长 (小时)
+            post_process_rate: 后处理单价 (元/小时)
         
         Returns:
-            dict: {
-                'quote': 报价金额,
-                'time_min': 预估时长(分钟),
-                'time_formatted': 格式化时长,
-                'efficiency': 使用的效率值,
-                'efficiency_source': 效率数据来源,
-                'cost_per_min': 每分钟成本,
-                'order_count': 参考的工单数
-            }
+            dict: 包含各项价格明细的字典
         """
         # 获取每分钟成本
         cost_per_min = CostCalculator.get_current_cost_per_minute()
@@ -211,8 +213,20 @@ class QuoteService:
         else:
             time_min = 0
         
-        # 计算报价
-        quote = time_min * cost_per_min * difficulty
+        # 计算基准打印价格
+        base_print_price = time_min * cost_per_min
+        
+        # 计算系数加成
+        coefficient = difficulty + risk
+        
+        # 计算打印价格 (含系数)
+        print_price = base_print_price * coefficient
+        
+        # 计算后处理价格
+        post_process_price = post_process_hours * post_process_rate
+        
+        # 计算最终总报价
+        total_quote = print_price + post_process_price
         
         # 格式化时长
         hours = int(time_min // 60)
@@ -223,13 +237,21 @@ class QuoteService:
             time_formatted = f"{minutes}分钟"
         
         return {
-            'quote': round(quote, 2),
+            'base_print_price': round(base_print_price, 2),
+            'print_price': round(print_price, 2),
+            'post_process_price': round(post_process_price, 2),
+            'total_quote': round(total_quote, 2),
+            'coefficient': coefficient,
+            'difficulty': difficulty,
+            'risk': risk,
             'time_min': round(time_min, 1),
             'time_formatted': time_formatted,
             'efficiency': round(efficiency, 4),
             'efficiency_source': source,
             'cost_per_min': round(cost_per_min, 4),
-            'order_count': order_count
+            'order_count': order_count,
+            'post_process_hours': post_process_hours,
+            'post_process_rate': post_process_rate
         }
     
     @staticmethod
